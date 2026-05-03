@@ -124,7 +124,8 @@ quizGenerator/
 - `POST /api/topics/{topic_id}/questions` - Create new question
 
 ### Quiz
-- `GET /api/quiz/random` - Get random quiz questions
+- `GET /api/quiz/random` - Get random quiz questions for a topic
+- `POST /api/quiz/generate` - **[NEW]** Generate quiz questions using AI for any custom topic
 
 ### WebSocket
 - `WS /ws/challenge/{session_id}/{player_name}` - Multiplayer challenge
@@ -166,6 +167,7 @@ quizGenerator/
 ### Backend (.env)
 ```env
 DATABASE_URL=postgresql://...your-neon-url...  # PostgreSQL on Neon.tech
+GEMINI_API_KEY=...your-gemini-api-key...       # Google Gemini API key for AI question generation
 HOST=0.0.0.0
 PORT=8000
 ```
@@ -175,12 +177,28 @@ PORT=8000
 VITE_API_URL=http://localhost:8000  # Backend API URL
 ```
 
-**Note:** Your PostgreSQL connection string is already configured in `.env`. No additional setup needed!
+**Note:** Your PostgreSQL connection string is already configured in `.env`. 
+
+### AI Features Setup
+
+To enable AI-powered quiz generation, you need to:
+
+1. **Get a Google Gemini API Key:**
+   - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Create a new API key
+   - Add it to your backend `.env` file as `GEMINI_API_KEY`
+
+2. **The app uses Gemini Pro** model for generating questions. You can modify the model in `ai_service.py`
+
+3. **Cost:** Gemini has a free tier with generous rate limits - perfect for testing and small apps!
 
 ## 📝 Features
 
 ✅ **Dynamic Quiz Categories** - Fetch quiz topics from the backend
 ✅ **Random Questions** - Get random questions per quiz
+✅ **AI-Powered Quiz Generation** - **[NEW]** Generate custom quizzes on any topic using Google Gemini
+✅ **Custom Topic Input** - **[NEW]** Users can enter any topic and get AI-generated questions using Gemini
+✅ **Difficulty Selection** - **[NEW]** Choose between Easy, Medium, and Hard questions
 ✅ **Score Tracking** - Real-time score calculation
 ✅ **Responsive Design** - Works on desktop and mobile
 ✅ **Fallback Data** - Uses hardcoded data if API is unavailable
@@ -220,12 +238,24 @@ bun run lint
 
 ## 🔄 How Integration Works
 
+### Pre-defined Categories (Database-based)
 1. **Frontend loads** → Calls `GET /api/topics`
 2. **Backend returns** topics list
 3. **User selects category** → Frontend calls `GET /api/topics/{id}/questions?limit=5`
 4. **Backend returns** random questions with choices
-5. **User answers** → Quiz calculates score locally (can be extended to backend)
+5. **User answers** → Quiz calculates score locally
 6. **Results shown** → User can restart or pick another topic
+
+### AI-Powered Generation (Custom Topics)
+1. **User enters custom topic** → Frontend shows custom topic form
+2. **User selects difficulty & number of questions** → Clicks "Generate Quiz"
+3. **Frontend calls** `POST /api/quiz/generate` with topic details
+4. **Backend calls Google Gemini API** to generate questions
+5. **Gemini returns** JSON with questions and answer choices
+6. **Backend validates** and returns formatted questions
+7. **Frontend displays** generated quiz with answer tracking
+8. **User answers** → Quiz calculates score
+9. **Results shown** → User can regenerate or pick another topic
 
 ## 🧪 Testing the Integration
 

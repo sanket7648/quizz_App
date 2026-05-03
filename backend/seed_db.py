@@ -243,6 +243,53 @@ QUIZ_DATA = {
                 "answer": 1
             },
         ]
+    },
+
+    "movies": {
+        "name": "Movies",
+        "icon": "🍿",
+        "questions": [
+            {
+                "text": "Who directed Inception?",
+                "options": ["Spielberg", "Nolan", "Cameron", "Tarantino"],
+                "answer": 1
+            },
+            {
+                "text": "Titanic released in?",
+                "options": ["1995", "1997", "1999", "2001"],
+                "answer": 1
+            },
+            {
+                "text": "Iron Man actor?",
+                "options": ["Chris Evans", "Robert Downey Jr.", "Mark Ruffalo", "Chris Hemsworth"],
+                "answer": 1
+            },
+            {
+                "text": "Highest grossing film (2024)?",
+                "options": ["Avatar", "Avengers Endgame", "Titanic", "Star Wars 7"],
+                "answer": 0
+            },
+            {
+                "text": "Joker (2019) lead?",
+                "options": ["Heath Ledger", "Joaquin Phoenix", "Jared Leto", "Jack Nicholson"],
+                "answer": 1
+            },
+            {
+                "text": "Studio behind Toy Story?",
+                "options": ["Disney", "Pixar", "DreamWorks", "Sony"],
+                "answer": 1
+            },
+            {
+                "text": "Matrix protagonist?",
+                "options": ["Neo", "Trinity", "Morpheus", "Smith"],
+                "answer": 0
+            },
+            {
+                "text": "Parasite is from?",
+                "options": ["Japan", "China", "S. Korea", "Vietnam"],
+                "answer": 2
+            },
+        ]
     }
 }
 

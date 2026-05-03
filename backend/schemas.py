@@ -1,8 +1,8 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class ChoiceBase(BaseModel):
-    id: int
+    id: Optional[int] = None
     text: str
     is_correct: bool
 
@@ -10,7 +10,7 @@ class ChoiceBase(BaseModel):
         from_attributes = True
 
 class QuestionBase(BaseModel):
-    id: int
+    id: Optional[int] = None
     text: str
     difficulty: int
     choices: List[ChoiceBase] = []
@@ -28,3 +28,13 @@ class TopicBase(BaseModel):
 class QuizRequest(BaseModel):
     topic_id: int
     num_questions: int = 5
+
+class GenerateQuizRequest(BaseModel):
+    topic: str
+    num_questions: int = 5
+    difficulty: int = 2
+
+class GeneratedQuiz(BaseModel):
+    topic: str
+    questions: List[QuestionBase]
+    generated_at: str
