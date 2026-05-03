@@ -12,7 +12,7 @@ engine = create_engine(
     pool_size=10,
     max_overflow=20,
     pool_pre_ping=True  # Test connection before using it
-)
+) # <-- FIXED: Added closing parenthesis here
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

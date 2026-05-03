@@ -17,27 +17,29 @@ class ConnectionManager:
             
         self.active_connections[session_id].append(websocket)
         self.scores[session_id][player_name] = 0
-
+        
         # Notify others in the room
         await self.broadcast(session_id, {
             "type": "system",
             "message": f"{player_name} has joined the challenge!"
         })
 
-    def disconnect(self, websocket: WebSocket, session_id: str, player_name: str):
+    # FIXED: Made this an async function to safely await the broadcast
+    async def disconnect(self, websocket: WebSocket, session_id: str, player_name: str):
         if session_id in self.active_connections:
-            self.active_connections[session_id].remove(websocket)
+            if websocket in self.active_connections[session_id]:
+                self.active_connections[session_id].remove(websocket)
+            
             if not self.active_connections[session_id]:
                 # Clean up if room is empty
                 del self.active_connections[session_id]
                 del self.scores[session_id]
             else:
                 # Announce departure
-                import asyncio
-                asyncio.create_task(self.broadcast(session_id, {
+                await self.broadcast(session_id, {
                     "type": "system",
                     "message": f"{player_name} disconnected."
-                }))
+                })
 
     async def broadcast(self, session_id: str, message: dict):
         """Sends a JSON message to all players in a specific session."""

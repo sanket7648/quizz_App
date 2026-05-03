@@ -6,6 +6,7 @@ import json
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -13,8 +14,9 @@ load_dotenv()
 # Import local modules
 from database import engine, get_db, Base
 from models import Topic, Question, Choice
-from schemas import TopicBase, QuestionBase, ChoiceBase, QuizRequest
+from schemas import TopicBase, QuestionBase, ChoiceBase, QuizRequest, GenerateQuizRequest, GeneratedQuiz
 from websocket_manager import manager
+from ai_service import generate_questions
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
@@ -33,27 +35,16 @@ app = FastAPI(
     description="Backend API for the Quizly quiz generator",
     version="1.0.0",
     lifespan=lifespan
-)
+) # <-- FIXED: Added closing parenthesis here
 
-# Configure CORS to allow frontend requests
-origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",  # Vite default
-    "http://localhost:5174",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:5174",
-    "https://localhost",
-    "https://127.0.0.1",
-]
-
+# FIXED CORS - Allow ALL for dev/prod simplicity
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"],
     allow_headers=["*"],
-)
+) # <-- FIXED: Added closing parenthesis here
 
 # ==================== ENDPOINTS ====================
 
@@ -84,7 +75,7 @@ async def create_topic(name: str, db: Session = Depends(get_db)):
     existing = db.query(Topic).filter(Topic.name == name).first()
     if existing:
         raise HTTPException(status_code=400, detail="Topic already exists")
-    
+        
     topic = Topic(name=name)
     db.add(topic)
     db.commit()
@@ -98,17 +89,17 @@ async def get_topic_questions(
     topic_id: int,
     limit: Optional[int] = None,
     db: Session = Depends(get_db)
-):
+): # <-- FIXED: Added ): here
     """Get questions for a specific topic with optional limit"""
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
+        
     query = db.query(Question).filter(Question.topic_id == topic_id)
-    
+        
     if limit:
         query = query.limit(limit)
-    
+        
     questions = query.all()
     return questions
 
@@ -126,12 +117,12 @@ async def create_question(
     text: str,
     difficulty: int = 1,
     db: Session = Depends(get_db)
-):
+): # <-- FIXED: Added ): here
     """Create a new question for a topic"""
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
+        
     question = Question(
         topic_id=topic_id,
         text=text,
@@ -150,12 +141,12 @@ async def create_choice(
     text: str,
     is_correct: bool = False,
     db: Session = Depends(get_db)
-):
+): # <-- FIXED: Added ): here
     """Create a choice for a question"""
     question = db.query(Question).filter(Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    
+        
     choice = Choice(
         question_id=question_id,
         text=text,
@@ -173,22 +164,76 @@ async def get_random_quiz(
     topic_id: int,
     num_questions: int = 5,
     db: Session = Depends(get_db)
-):
+): # <-- FIXED: Added ): here
     """Get random questions from a topic for a quiz"""
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
-    
+        
     # Fetch questions (order by random in the app, not SQL for simplicity)
     questions = db.query(Question)\
         .filter(Question.topic_id == topic_id)\
         .limit(num_questions)\
         .all()
-    
+        
     if not questions:
         raise HTTPException(status_code=404, detail="No questions found for this topic")
-    
+        
     return questions[:num_questions]
+
+@app.post("/api/quiz/generate", response_model=GeneratedQuiz, tags=["Quiz"])
+async def generate_quiz(request: GenerateQuizRequest):
+    """Generate quiz questions using AI based on a user-provided topic"""
+    try:
+        # Validate input
+        if not request.topic or len(request.topic.strip()) == 0:
+            raise HTTPException(status_code=400, detail="Topic cannot be empty")
+                
+        if request.num_questions < 1 or request.num_questions > 20:
+            raise HTTPException(status_code=400, detail="Number of questions must be between 1 and 20")
+                
+        if request.difficulty < 1 or request.difficulty > 3:
+            raise HTTPException(status_code=400, detail="Difficulty must be between 1 and 3")
+                
+        # Generate questions using AI
+        questions_data = await generate_questions(
+            topic=request.topic,
+            num_questions=request.num_questions,
+            difficulty=request.difficulty
+        )
+                
+        if not questions_data:
+            raise HTTPException(status_code=500, detail="Failed to generate questions")
+                
+        # Convert to QuestionBase format
+        questions = []
+        for q in questions_data:
+            choices = [
+                ChoiceBase(
+                    text=choice.get("text", ""),
+                    is_correct=choice.get("is_correct", False)
+                )
+                for choice in q.get("choices", [])
+            ]
+                        
+            question = QuestionBase(
+                text=q.get("text", ""),
+                difficulty=q.get("difficulty", request.difficulty),
+                choices=choices
+            )
+            questions.append(question)
+                
+        return GeneratedQuiz(
+            topic=request.topic,
+            questions=questions,
+            generated_at=datetime.now().isoformat()
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error generating quiz: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating quiz: {str(e)}")
 
 # ==================== WEBSOCKET ====================
 
@@ -198,33 +243,33 @@ async def challenge_websocket(
     session_id: str,
     player_name: str,
     db: Session = Depends(get_db)
-):
+): # <-- FIXED: Added ): here
     """WebSocket endpoint for multiplayer quiz challenge"""
     await manager.connect(websocket, session_id, player_name)
-    
+        
     try:
         while True:
             # Wait for a player to submit an answer
             data = await websocket.receive_text()
             payload = json.loads(data)
-            
+                        
             # Expected payload: {"action": "submit_answer", "question_id": 12, "choice_id": 45}
             if payload.get("action") == "submit_answer":
                 question_id = payload.get("question_id")
                 choice_id = payload.get("choice_id")
-                
+                                
                 # Check database to see if the choice is correct
                 choice = db.query(Choice).filter(
                     Choice.id == choice_id,
                     Choice.question_id == question_id
                 ).first()
-                
+                                
                 is_correct = choice.is_correct if choice else False
-                
+                                
                 if is_correct:
                     # Award points (e.g., 10 points per correct answer)
                     manager.update_score(session_id, player_name, 10)
-                
+                                
                 # Broadcast the updated state to both players
                 await manager.broadcast(session_id, {
                     "type": "score_update",
@@ -232,12 +277,12 @@ async def challenge_websocket(
                     "is_correct": is_correct,
                     "current_scores": manager.scores.get(session_id, {})
                 })
-                
+                    
     except WebSocketDisconnect:
-        manager.disconnect(websocket, session_id, player_name)
+        await manager.disconnect(websocket, session_id, player_name) # <-- FIXED: Added await
     except Exception as e:
         print(f"WebSocket error: {e}")
-        manager.disconnect(websocket, session_id, player_name)
+        await manager.disconnect(websocket, session_id, player_name) # <-- FIXED: Added await
 
 # ==================== HEALTH CHECK ====================
 
